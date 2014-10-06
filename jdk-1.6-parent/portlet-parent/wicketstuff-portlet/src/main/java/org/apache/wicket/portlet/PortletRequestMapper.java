@@ -31,15 +31,17 @@ import org.apache.wicket.IResourceListener;
 import org.apache.wicket.RequestListenerInterface;
 import org.apache.wicket.SystemMapper;
 import org.apache.wicket.behavior.IBehaviorListener;
+import org.apache.wicket.core.request.handler.BookmarkableListenerInterfaceRequestHandler;
+import org.apache.wicket.core.request.handler.BookmarkablePageRequestHandler;
+import org.apache.wicket.core.request.handler.ListenerInterfaceRequestHandler;
+import org.apache.wicket.core.request.handler.RenderPageRequestHandler;
+import org.apache.wicket.core.request.mapper.AbstractComponentMapper;
+import org.apache.wicket.markup.html.form.IFormSubmitListener;
 import org.apache.wicket.request.IRequestHandler;
 import org.apache.wicket.request.Request;
 import org.apache.wicket.request.Url;
 import org.apache.wicket.request.cycle.RequestCycle;
-import org.apache.wicket.core.request.handler.BookmarkablePageRequestHandler;
-import org.apache.wicket.core.request.handler.ListenerInterfaceRequestHandler;
-import org.apache.wicket.core.request.handler.RenderPageRequestHandler;
 import org.apache.wicket.request.handler.resource.ResourceReferenceRequestHandler;
-import org.apache.wicket.core.request.mapper.AbstractComponentMapper;
 import org.apache.wicket.request.resource.IResource;
 import org.apache.wicket.request.resource.PackageResource;
 import org.apache.wicket.request.resource.SharedResourceReference;
@@ -99,33 +101,55 @@ public class PortletRequestMapper extends AbstractComponentMapper {
 		}
 		else if (requestHandler instanceof BookmarkablePageRequestHandler) {
 			url = encodeRenderUrl(url, true);
-		}
+    	} 
 		else if (requestHandler instanceof ListenerInterfaceRequestHandler) {
-			ListenerInterfaceRequestHandler listenerInterfaceRequestHandler = (ListenerInterfaceRequestHandler) requestHandler;
-
-			RequestListenerInterface listenerInterface = listenerInterfaceRequestHandler.getListenerInterface();
-			Class<?> listenerClass = listenerInterface.getMethod().getDeclaringClass();
-
-			if ((IResourceListener.class.isAssignableFrom(listenerClass)) || (IBehaviorListener.class.isAssignableFrom(listenerClass))) {
-				url = encodeResourceUrl(url);
-			}
-			else if (IRedirectListener.class.isAssignableFrom(listenerClass)) {
-				if (ThreadPortletContext.isAjax()) {
-					url = encodeRenderUrl(url, true);
-				}
-				else {
-					url = encodeRenderUrl(url, false);
-				}
-			}
-			else {
-				if (ThreadPortletContext.isAjax()) {
-					url = encodeActionUrl(url, true);
-				}
-				else {
-					url = encodeActionUrl(url, false);
-				}
-			}
-		}
+            ListenerInterfaceRequestHandler listenerInterfaceRequestHandler = (ListenerInterfaceRequestHandler) requestHandler;
+    
+            RequestListenerInterface listenerInterface = listenerInterfaceRequestHandler.getListenerInterface();
+            Class<?> listenerClass = listenerInterface.getMethod().getDeclaringClass();
+    
+            if ((IResourceListener.class.isAssignableFrom(listenerClass))
+                    || (IBehaviorListener.class.isAssignableFrom(listenerClass))) {
+                url = encodeResourceUrl(url);
+            } else if (IRedirectListener.class.isAssignableFrom(listenerClass)
+                    || IFormSubmitListener.class.isAssignableFrom(listenerClass)) {
+                if (ThreadPortletContext.isAjax()) {
+                    url = encodeRenderUrl(url, true);
+                } else {
+                    url = encodeRenderUrl(url, false);
+                }
+            } else {
+                if (ThreadPortletContext.isAjax()) {
+                    url = encodeActionUrl(url, true);
+                } else {
+                    url = encodeActionUrl(url, false);
+                }
+            }
+        } 
+		else if (requestHandler instanceof BookmarkableListenerInterfaceRequestHandler) {
+            BookmarkableListenerInterfaceRequestHandler listenerInterfaceRequestHandler = (BookmarkableListenerInterfaceRequestHandler) requestHandler;
+    
+            RequestListenerInterface listenerInterface = listenerInterfaceRequestHandler.getListenerInterface();
+            Class<?> listenerClass = listenerInterface.getMethod().getDeclaringClass();
+    
+            if ((IResourceListener.class.isAssignableFrom(listenerClass))
+                    || (IBehaviorListener.class.isAssignableFrom(listenerClass))) {
+                url = encodeResourceUrl(url);
+            } else if (IRedirectListener.class.isAssignableFrom(listenerClass)
+                    || IFormSubmitListener.class.isAssignableFrom(listenerClass)) {
+                if (ThreadPortletContext.isAjax()) {
+                    url = encodeRenderUrl(url, true);
+                } else {
+                    url = encodeRenderUrl(url, false);
+                }
+            } else {
+                if (ThreadPortletContext.isAjax()) {
+                    url = encodeActionUrl(url, true);
+                } else {
+                    url = encodeActionUrl(url, false);
+                }
+            }
+        }
 
 		return url;
 	}
