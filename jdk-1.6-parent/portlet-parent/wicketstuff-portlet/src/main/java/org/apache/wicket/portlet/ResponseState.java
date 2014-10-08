@@ -295,9 +295,11 @@ public class ResponseState {
 			headerList.clear();
 			headerList.add(value);
 
+			/* Je désactive cela pour le redirect ajax. Je ne sais pas ce que cela fait ici!
 			if (AJAX_LOCATION_HEADER_NAME.equalsIgnoreCase(name)) {
 				redirectLocation = value;
 			}
+			*/
 		}
 	}
 

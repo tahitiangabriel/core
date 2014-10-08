@@ -509,7 +509,7 @@ public class WicketPortlet extends GenericPortlet {
 						responseState.setDateHeader("Expires", 0);
 						responseState.setHeader("Pragma", "no-cache");
 						responseState.setHeader("Cache-Control", "no-cache, no-store");
-						responseState.setContentType("text/xml;charset=UTF-8");
+						//responseState.setContentType("text/xml;charset=UTF-8");
 						responseState.getWriter().write("<ajax-response><redirect><![CDATA[" + redirectLocation + "]]></redirect></ajax-response>");
 						responseState.flushAndClose();
 					}
