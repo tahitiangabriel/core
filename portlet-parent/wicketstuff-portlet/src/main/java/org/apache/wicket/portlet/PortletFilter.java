@@ -53,124 +53,136 @@ import org.apache.wicket.util.crypt.Base64;
  * functionality. It is responsible for the initialization of all portlet
  * specific settings of the WebApplication and wraps the portlet request and
  * portlet response objects by an http servlet request / response wrapper.
- * 
+ *
  * @author Peter Pastrnak
  * @author Konstantinos Karavitis
  */
 public class PortletFilter extends WicketFilter {
-	public static final String SHARED_RESOURCE_URL_PORTLET_WINDOW_ID_PREFIX = "/ps:";
-	
-	private static String NOT_MOUNTED_PATH = "notMountedPath";
+    public static final String SHARED_RESOURCE_URL_PORTLET_WINDOW_ID_PREFIX = "/ps:";
 
-	private FilterConfig filterConfig;
-	
-	@Override
-	public void init(boolean isServlet, FilterConfig filterConfig) throws ServletException {
-		super.init(isServlet, filterConfig);
-		this.filterConfig = filterConfig;
-		getApplication().getRequestCycleSettings().setRenderStrategy(RenderStrategy.REDIRECT_TO_RENDER);
-		getApplication().getRequestCycleSettings().addResponseFilter(new PortletInvalidMarkupFilter());
-		//fix for https://github.com/wicketstuff/core/issues/487
-		getApplication().getMarkupSettings().setMarkupIdGenerator(new PortletMarkupIdGenerator());
-		//make the wicket bridge schema (HTTPS/HTTP) aware
-		getApplication().setRootRequestMapper(new HttpsMapper(new PortletRequestMapper(getApplication()), new HttpsConfig()){
-			@Override
-			protected Scheme getDesiredSchemeFor(IRequestHandler handler) {
-				Request request = RequestCycle.get().getRequest();
-				return super.getSchemeOf(request);
-			}
-		});
-		//Application must use the portlet specific page renderer provider.
-		getApplication().setPageRendererProvider(new IPageRendererProvider() {
-			@Override
-			public PageRenderer get(RenderPageRequestHandler handler) {
-				return new PortletPageRenderer(handler);
-			}
-		});
-		// fix for https://github.com/wicketstuff/core/issues/478 issue
-		getApplication().setRequestCycleProvider(new IRequestCycleProvider() {
-			@Override
-			public RequestCycle get(RequestCycleContext context) {
-				return new RequestCycle(context) {
-					@Override
-					protected UrlRenderer newUrlRenderer() {
-						return new PortletUrlRenderer(getRequest());
-					}
-				};
-			}
-		});
-		//fix for https://github.com/wicketstuff/core/issues/588 issue
-		getApplication().getJavaScriptLibrarySettings().setWicketAjaxReference(WicketPortletAjaxResourceReference.get());
-	}
+    private static String NOT_MOUNTED_PATH = "notMountedPath";
 
-	@Override
-	public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
-		HttpServletRequest httpServletRequest = (HttpServletRequest) servletRequest;
-		HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
-		String filterPath = getFilterPath(httpServletRequest);
+    private FilterConfig filterConfig;
 
-		PortletRequest portletRequest = (PortletRequest) httpServletRequest.getAttribute("javax.portlet.request");
-		if (portletRequest != null) {
-			final PortletConfig portletConfig = (PortletConfig) httpServletRequest.getAttribute("javax.portlet.config");
-			final ResponseState responseState = (ResponseState) httpServletRequest.getAttribute(WicketPortlet.RESPONSE_STATE_ATTR);
+    @Override
+    public void init(final boolean isServlet, final FilterConfig filterConfig) throws ServletException {
+        super.init(isServlet, filterConfig);
+        this.filterConfig = filterConfig;
+        getApplication().getRequestCycleSettings().setRenderStrategy(RenderStrategy.REDIRECT_TO_RENDER);
+        getApplication().getRequestCycleSettings().addResponseFilter(new PortletInvalidMarkupFilter());
+        // fix for https://github.com/wicketstuff/core/issues/487
+        getApplication().getMarkupSettings().setMarkupIdGenerator(new PortletMarkupIdGenerator());
+        // make the wicket bridge schema (HTTPS/HTTP) aware
+        getApplication()
+                .setRootRequestMapper(new HttpsMapper(new PortletRequestMapper(getApplication()), new HttpsConfig()) {
+                    @Override
+                    protected Scheme getDesiredSchemeFor(final IRequestHandler handler) {
+                        final Request request = RequestCycle.get().getRequest();
+                        return super.getSchemeOf(request);
+                    }
+                });
+        // Application must use the portlet specific page renderer provider.
+        getApplication().setPageRendererProvider(new IPageRendererProvider() {
+            @Override
+            public PageRenderer get(final RenderPageRequestHandler handler) {
+                return new PortletPageRenderer(handler);
+            }
+        });
+        // fix for https://github.com/wicketstuff/core/issues/478 issue
+        getApplication().setRequestCycleProvider(new IRequestCycleProvider() {
+            @Override
+            public RequestCycle get(final RequestCycleContext context) {
+                return new RequestCycle(context) {
+                    @Override
+                    protected UrlRenderer newUrlRenderer() {
+                        return new PortletUrlRenderer(getRequest());
+                    }
+                };
+            }
+        });
+        // fix for https://github.com/wicketstuff/core/issues/588 issue
+        getApplication().getJavaScriptLibrarySettings()
+                .setWicketAjaxReference(WicketPortletAjaxResourceReference.get());
+    }
 
-			if (portletConfig != null) {
-				if (responseState == null) {
-					filterChain.doFilter(httpServletRequest, httpServletResponse);
-					return;
-				}
+    @Override
+    public void doFilter(final ServletRequest servletRequest, final ServletResponse servletResponse,
+            final FilterChain filterChain) throws IOException, ServletException {
+        HttpServletRequest httpServletRequest = (HttpServletRequest) servletRequest;
+        HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
+        final String filterPath = getFilterPath(httpServletRequest);
 
-				HttpSession proxiedSession = PortletHttpSessionWrapper.createProxy(
-					httpServletRequest, portletRequest.getWindowID(), getApplication()
-						.getSessionAttributePrefix(null, filterConfig.getFilterName()));
-				
-				httpServletRequest = new PortletServletRequestWrapper(filterConfig.getServletContext(), httpServletRequest, proxiedSession, filterPath);
-				httpServletResponse = new PortletServletResponseWrapper(httpServletResponse, responseState);
-			}
-		}
-		else {
-			// look for windowId and serve it as a shared resource
+        // Pour gèrer le extend session de liferay qui plante tout!
+        if ("/c/portal/extend_session".equals(httpServletRequest.getRequestURI())
+                || "/html/portal/extend_session.jsp".equals(httpServletRequest.getRequestURI())) {
+            return;
+        }
 
-			String pathInfo = httpServletRequest.getRequestURI().substring(httpServletRequest.getContextPath().length() + filterPath.length());
-			if (pathInfo.startsWith(SHARED_RESOURCE_URL_PORTLET_WINDOW_ID_PREFIX)) {
+        final PortletRequest portletRequest = (PortletRequest) httpServletRequest.getAttribute("javax.portlet.request");
+        if (portletRequest != null) {
+            final PortletConfig portletConfig = (PortletConfig) httpServletRequest.getAttribute("javax.portlet.config");
+            final ResponseState responseState = (ResponseState) httpServletRequest
+                    .getAttribute(WicketPortlet.RESPONSE_STATE_ATTR);
 
-				int nextSeparator = pathInfo.indexOf('/', 1);
-				if (nextSeparator > 0) {
-					String windowId = new String(Base64.decodeBase64(pathInfo.substring(SHARED_RESOURCE_URL_PORTLET_WINDOW_ID_PREFIX.length(), nextSeparator)));
-					
-					HttpSession proxiedSession = PortletHttpSessionWrapper.createProxy(
-						httpServletRequest,
-						windowId,
-						getApplication().getSessionAttributePrefix(null,
-							filterConfig.getFilterName()));
-					
-					pathInfo = pathInfo.substring(nextSeparator);
-					httpServletRequest = new PortletServletRequestWrapper(filterConfig.getServletContext(), httpServletRequest, proxiedSession, filterPath, pathInfo);
-				}
-			}
-		}
+            if (portletConfig != null) {
+                if (responseState == null) {
+                    filterChain.doFilter(httpServletRequest, httpServletResponse);
+                    return;
+                }
 
-		super.doFilter(httpServletRequest, httpServletResponse, filterChain);
-	}
-	
-	protected boolean processRequestCycle(RequestCycle requestCycle, WebResponse webResponse,
-			HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, final FilterChain chain)
-			throws IOException, ServletException {
-		// Assume we are able to handle the request
-		boolean res = true;
+                final HttpSession proxiedSession = PortletHttpSessionWrapper.createProxy(httpServletRequest,
+                        portletRequest.getWindowID(),
+                        getApplication().getSessionAttributePrefix(null, filterConfig.getFilterName()));
 
-		if (requestCycle.processRequestAndDetach()) {
-			webResponse.flush();
-		} else if (httpServletRequest.getPathInfo() != null
-				&& httpServletRequest.getPathInfo().equals(httpServletRequest.getAttribute(NOT_MOUNTED_PATH))) {
-			throw new AbortWithHttpErrorCodeException(404, httpServletRequest.getPathInfo() + " is not mounted to any Page");
-		} else {
-			if (chain != null) {
-				httpServletRequest.setAttribute(NOT_MOUNTED_PATH, httpServletRequest.getPathInfo());
-				chain.doFilter(httpServletRequest, httpServletResponse);
-			}
-			res = false;
-		}
-		return res;
-	}
+                httpServletRequest = new PortletServletRequestWrapper(filterConfig.getServletContext(),
+                        httpServletRequest, proxiedSession, filterPath);
+                httpServletResponse = new PortletServletResponseWrapper(httpServletResponse, responseState);
+            }
+        } else {
+            // look for windowId and serve it as a shared resource
+
+            String pathInfo = httpServletRequest.getRequestURI()
+                    .substring(httpServletRequest.getContextPath().length() + filterPath.length());
+            if (pathInfo.startsWith(SHARED_RESOURCE_URL_PORTLET_WINDOW_ID_PREFIX)) {
+
+                final int nextSeparator = pathInfo.indexOf('/', 1);
+                if (nextSeparator > 0) {
+                    final String windowId = new String(Base64.decodeBase64(
+                            pathInfo.substring(SHARED_RESOURCE_URL_PORTLET_WINDOW_ID_PREFIX.length(), nextSeparator)));
+
+                    final HttpSession proxiedSession = PortletHttpSessionWrapper.createProxy(httpServletRequest,
+                            windowId, getApplication().getSessionAttributePrefix(null, filterConfig.getFilterName()));
+
+                    pathInfo = pathInfo.substring(nextSeparator);
+                    httpServletRequest = new PortletServletRequestWrapper(filterConfig.getServletContext(),
+                            httpServletRequest, proxiedSession, filterPath, pathInfo);
+                }
+            }
+        }
+
+        super.doFilter(httpServletRequest, httpServletResponse, filterChain);
+    }
+
+    @Override
+    protected boolean processRequestCycle(final RequestCycle requestCycle, final WebResponse webResponse,
+            final HttpServletRequest httpServletRequest, final HttpServletResponse httpServletResponse,
+            final FilterChain chain) throws IOException, ServletException {
+        // Assume we are able to handle the request
+        boolean res = true;
+
+        if (requestCycle.processRequestAndDetach()) {
+            webResponse.flush();
+        } else if ((httpServletRequest.getPathInfo() != null)
+                && httpServletRequest.getPathInfo().equals(httpServletRequest.getAttribute(NOT_MOUNTED_PATH))) {
+            throw new AbortWithHttpErrorCodeException(404,
+                    httpServletRequest.getPathInfo() + " is not mounted to any Page");
+        } else {
+            if (chain != null) {
+                httpServletRequest.setAttribute(NOT_MOUNTED_PATH, httpServletRequest.getPathInfo());
+                chain.doFilter(httpServletRequest, httpServletResponse);
+            }
+            res = false;
+        }
+        return res;
+    }
 }
